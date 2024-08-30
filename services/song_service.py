@@ -1,38 +1,40 @@
 from datetime import datetime
+from typing import Annotated
 
 from fastapi import Depends
-from odmantic.query import QueryExpression
+from odmantic import ObjectId
 
-from schemas.web import Page, PageRequest
-from odmantic import AIOEngine, ObjectId
-
-from configuration.mongo import engine, mongo_repo
+from configuration.mongo import engine
 from errors import NotFoundError
 from models.music import Song
+from repo.music import SongRepo
 from schemas.music import SongIn, SongOut, SongQuery
+from schemas.web import Page, PageRequest
 
-
-def to_mongo_query(query: SongQuery) -> QueryExpression:
-    Song.created_at.eq
+# replace with uuid7 when merged
+from uuid import uuid4 as uuid, UUID
 
 
 class SongService:
-    repo: AIOEngine = Depends(mongo_repo())
 
-    def __init__(self, nosql: AIOEngine):
-        self.nosql = nosql
+    def __init__(self, song_repo: Annotated[SongRepo, Depends(SongRepo)]):
+        self.song_repo = song_repo
 
-    async def create_song(self, song: SongIn) -> ObjectId:
+    async def create_song(self, song: SongIn) -> UUID:
         now = datetime.now()
+        song_id = uuid()
 
-        # noinspection Pydantic
-        return (await self.nosql.save(Song(**song.model_dump(), created_at=now, updated_at=now))).id
+        persisted_song = Song(**song.model_dump(), created_at=now, updated_at=now)
+        persisted_song.id = song_id
+        await self.song_repo.save(persisted_song)
+        return song_id
 
-    async def read_song(self, id: ObjectId) -> SongOut:
-        song = await self.nosql.find_one(Song, {'_id': id})
-        if song is None:
-            raise NotFoundError(Song, str(id))
-        return SongOut(**song.model_dump())
+    async def read_song(self, song_id: UUID) -> SongOut:
+        persisted_song = await self.song_repo.find_by_id(song_id)
+        if persisted_song is None:
+            raise NotFoundError(resource_type=Song, resource_id=song_id)
+
+        return SongOut(**persisted_song.model_dump())
 
     async def list_songs(self, query: SongQuery, page: PageRequest) -> Page[SongOut]:
         # construct criteria for matching

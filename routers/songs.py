@@ -1,38 +1,39 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from fastapi.params import Query
-from fastapi_utils.cbv import cbv
+from fastapi import APIRouter, Depends, Path, Body
 
-from schemas.web import PageRequest
-from services.song_service import SongService
-from schemas.web import Page, PageRequest
 from schemas.music import SongOut, SongIn, SongQuery
-from odmantic import ObjectId
+from schemas.web import Page
+from schemas.web import PageRequestDep
+from services.song_service import SongService
 
-router = APIRouter()
+song_router = APIRouter()
 
 
-@cbv(router)
-class SongRouter:
-    song_service = Depends(SongService)
+@song_router.post("/song")
+async def create_song(song_service: Annotated[SongService, Depends(SongService)],
+                      song: Annotated[SongIn, Body(title="The song to create")]) -> UUID:
+    return await song_service.create_song(song)
 
-    @router.post("/song")
-    async def create_song(self):
-        pass
 
-    @router.get("/song/{song_id}")
-    async def read_song(self):
-        pass
+@song_router.get("/song/{song_id}")
+async def read_song(song_id: Annotated[UUID, Path(title="The ID of the song to read")]) -> SongOut:
+    pass
 
-    @router.get("/songs")
-    async def list_songs(self, query: Annotated[SongQuery, Query(default=SongQuery())]) -> Page[SongOut]:
-        return await self.song_service.list_songs(query)
 
-    @router.put("/song/{song_id}")
-    async def update_song(self, song_id: ObjectId, song: Annotated[SongIn]):
-        pass
+@song_router.get("/songs")
+async def list_songs(self, query: Annotated[SongQuery, Depends(SongQuery)],
+                     page_request: PageRequestDep) -> Page[SongOut]:
+    pass
 
-    @router.delete("/song/{song_id}")
-    async def delete_song(self):
-        pass
+
+@song_router.put("/song/{song_id}")
+async def update_song(song_id: Annotated[UUID, Path(title="The ID of the song to update")],
+                      song: Annotated[SongIn, Body()]):
+    pass
+
+
+@song_router.delete("/song/{song_id}")
+async def delete_song(song_id: Annotated[UUID, Path(title="The ID of the song to delete")]):
+    pass
